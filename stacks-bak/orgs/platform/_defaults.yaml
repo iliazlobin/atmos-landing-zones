@@ -1,0 +1,30 @@
+import:
+  - orgs/_defaults
+
+# vars:
+#   namespace: cp
+
+terraform:
+  vars:
+    tenant: platform
+
+  backend_type: s3
+  backend:
+    s3:
+      encrypt: true
+      bucket: "elza-ue2-root-tfstate"
+      key: "terraform.tfstate"
+      dynamodb_table: "elza-ue2-root-tfstate-lock"
+      acl: "bucket-owner-full-control"
+      region: "us-east-2"
+      role_arn: null
+  remote_state_backend:
+    s3:
+      role_arn: "arn:aws:iam::123456789012:role/cp-gbl-root-terraform"
+
+helmfile:
+  vars: {}
+
+components:
+  terraform: {}
+  helmfile: {}

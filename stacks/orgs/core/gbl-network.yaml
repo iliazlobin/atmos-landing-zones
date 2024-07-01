@@ -1,0 +1,162 @@
+import:
+  - orgs/_defaults
+
+vars:
+  tenant: core
+  region: us-east-1
+  environment: gbl
+  stage: network
+
+components:
+  terraform:
+    aws-team-roles:
+      vars:
+        enabled: true
+        roles:
+          # `template` serves as the default configuration for other roles via the YAML anchor.
+          # However, `atmos` does not support "import" of YAML anchors, so if you define a new role
+          # in another file, you will not be able to reference this anchor.
+          template:
+            &user-template # If `enabled: false`, the role will not be created in this account
+            enabled: false
+
+            # `max_session_duration` set the maximum session duration (in seconds) for the IAM roles.
+            # This setting can have a value from 3600 (1 hour) to 43200 (12 hours).
+            # For roles people log into via SAML, a long duration is convenient to prevent them
+            # from having to frequently re-authenticate.
+            # For roles assumed from some other role, the setting is practically irrelevant, because
+            # the AssumeRole API limits the duration to 1 hour in any case.
+            # References:
+            # - https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use.html
+            # - https://docs.aws.amazon.com/STS/latest/APIReference/API_AssumeRole.html
+            max_session_duration: 3600 # 1 hour in seconds
+
+            # role_policy_arns are the IAM Policy ARNs to attach to this policy. In addition to real ARNs,
+            # you can use keys in the `custom_policy_map` in `main.tf` to select policies defined in the component.
+            # If you are using keys from the map, plans look better if you put them after the real role ARNs.
+            role_policy_arns: []
+            role_description: "Template role, should not exist"
+
+            # If `aws_saml_login_enabled: true` then the role will be available via SAML logins,
+            # but only via the SAML IDPs configured for this account.
+            # Otherwise, it will only be accessible via `assume role`.
+            aws_saml_login_enabled: false
+
+            ## The following attributes control access to this role via `assume role`.
+            ## `trusted_*` grants access, `denied_*` denies access.
+            ## If a role is both trusted and denied, it will not be able to access this role.
+
+            # Permission sets specify users operating from the given AWS SSO permission set in this account.
+            trusted_permission_sets: []
+            denied_permission_sets: []
+
+            # Primary roles specify the short role names of roles in the primary (identity)
+            # account that are allowed to assume this role.
+            # BE CAREFUL: This is setting the default access for other roles.
+            trusted_teams: []
+            denied_teams: []
+
+            # Role ARNs specify Role ARNs in any account that are allowed to assume this role.
+            # BE CAREFUL: there is nothing limiting these Role ARNs to roles within our organization.
+            trusted_role_arns: []
+            denied_role_arns: []
+
+          ##
+          ## admin and terraform are the core team roles
+          ##
+
+          admin:
+            <<: *user-template
+            enabled: true
+            role_policy_arns:
+              - "arn:aws:iam::aws:policy/AdministratorAccess"
+            role_description: "Full administration of this account"
+            trusted_teams: ["admin"]
+
+          terraform:
+            <<: *user-template
+            enabled: true
+            # We require Terraform to be allowed to create and modify IAM roles
+            # and policies (e.g. for EKS service accounts), so there is no use trying to restrict it.
+            # For better security, we could segregate components that needed
+            # administrative permissions and use a more restrictive role
+            # for Terraform, such as PowerUser (further restricted to deny AWS SSO changes).
+            role_policy_arns:
+              - "arn:aws:iam::aws:policy/AdministratorAccess"
+            role_description: "Role for Terraform administration of this account"
+            trusted_teams: ["admin"]
+
+    vpc:
+      vars:
+        enabled: true
+        subnet_type_tag_key: "core.lzazure.com/subnet/type"
+        vpc_flow_logs_enabled: true
+        vpc_flow_logs_traffic_type: ALL
+        ipv4_primary_cidr_block: "10.1.0.0/16"
+        ipv4_cidrs:
+            gw: ["10.1.0.0/24", "10.1.1.0/24"]
+            inspection: ["10.1.10.0/24", "10.1.11.0/24"]
+            # service: ["10.1.20.0/24", "10.1.21.0/24"]
+            protected: ["10.1.90.0/24", "10.1.91.0/24"]
+            # public: ["10.1.100.0/24", "10.1.101.0/24"]
+            private: ["10.1.110.0/24", "10.1.111.0/24"]
+            # data: ["10.1.120.0/24", "10.1.121.0/24"]
+        public_subnets_enabled: false
+        max_subnet_count: 2
+        max_nats: 2
+        network_firewall_enabled: true
+        cloud_wan_enabled: true # enable after provisioning the private subnets
+        # clod_wan_route_cidrs:
+        #   - "10.11.0.0/16"
+        #   - "10.21.0.0/16"
+    cloud-wan:
+      vars:
+        # parameters: https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/networkmanager_core_network_policy_document
+        # documentation: https://docs.aws.amazon.com/network-manager/latest/cloudwan/cloudwan-policies-json.html
+        asn_ranges:
+          - "64512-64550"
+        edge_locations:
+          - location: "us-east-1"
+            asn: 64512
+          - location: "us-east-2"
+            asn: 64513
+        segments:
+          prod:
+            description: "Production"
+            require_attachment_acceptance: false
+        attachment_policies:
+          - action:
+              association_method: "constant"
+              segment: "prod"
+              edge_locations:
+                - "us-east-1"
+                - "us-west-2"
+            rule_number: 200
+            condition_logic: "or"
+            conditions:
+              - type: "tag-value"
+                operator: "equals"
+                key: "Stage"
+                value: "prod"
+              - type: "tag-value"
+                operator: "equals"
+                key: "Stage"
+                value: "network"
+        segment_actions:
+          # - segment: shared
+          #   action: "share"
+          #   mode: "attachment-route"
+          #   share_with: ["*"]
+          - segment: prod
+            action: "create-route"
+            destination_cidr_blocks: [
+              "0.0.0.0/0"
+            ]
+            destinations: [
+              "attachment-0174cd0fee08b12b2"
+            ]
+        resource_share_principles: # uncomment when accounts are ready
+          - tenant: epme3s
+            stage: prod
+          - tenant: epmweb
+            stage: prod

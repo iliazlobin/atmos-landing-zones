@@ -1,0 +1,123 @@
+import:
+  - orgs/_defaults
+
+vars:
+  tenant: core
+  region: us-east-1
+  environment: gbl
+  stage: identity
+
+security-auditors: &security-auditors
+  "AWSAuditAccountAdmins":
+    permission_sets:
+      - AdministratorAccess
+      - ReadOnlyAccess
+
+components:
+  terraform:
+    aws-teams:
+      backend:
+        s3:
+          role_arn: null
+      vars:
+        enabled: true
+        teams_config:
+          # Viewer has the same permissions as Observer but only in this account. It is not allowed access to other accounts.
+          # Viewer also serves as the default configuration for all roles via the YAML anchor.
+          viewer: &user-template
+            # `max_session_duration` set the maximum session duration (in seconds) for the IAM roles.
+            # This setting can have a value from 3600 (1 hour) to 43200 (12 hours).
+            # For roles people log into via SAML, a long duration is convenient to prevent them
+            # from having to frequently re-authenticate.
+            # For roles assumed from some other role, the setting is practically irrelevant, because
+            # the AssumeRole API limits the duration to 1 hour in any case.
+            # References:
+            # - https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use.html
+            # - https://docs.aws.amazon.com/STS/latest/APIReference/API_AssumeRole.html
+            max_session_duration: 43200 # 12 hours in seconds
+
+            # role_policy_arns are the IAM Policy ARNs to attach to this policy. In addition to real ARNs,
+            # you can use keys in the `custom_policy_map` in `main.tf` to select policies defined in the component.
+            # If you are using keys from the map, plans look better if you put them after the real role ARNs.
+            role_policy_arns:
+              - "arn:aws:iam::aws:policy/job-function/ViewOnlyAccess"
+            role_description: "Team restricted to viewing resources in the identity account"
+            # If `aws_saml_login_enabled: true` then the role will be available via SAML logins.
+            # Otherwise, it will only be accessible via `assume role`.
+            aws_saml_login_enabled: false
+
+            # The following attributes control access to this role via `assume role`.
+            # `trusted_*` grants access, `denied_*` denies access.
+            # If a role is both trusted and denied, it will not be able to access this role.
+
+            # Permission sets specify users operating from the given AWS SSO permission set in this account.
+            trusted_permission_sets: [ ]
+            denied_permission_sets: [ ]
+
+            # Primary roles specify the short role names of roles in the primary (identity)
+            # account that are allowed to assume this role.
+            trusted_teams: [ ]
+            denied_teams: [ "viewer" ]
+
+            # Role ARNs specify Role ARNs in any account that are allowed to assume this role.
+            # BE CAREFUL: there is nothing limiting these Role ARNs to roles within our organization.
+            trusted_role_arns: [ ]
+            denied_role_arns: [ ]
+
+          admin:
+            <<: *user-template
+            role_description: "Team with PowerUserAccess permissions in `identity` and AdministratorAccess to all other accounts except `root`"
+            # Limit `admin` to Power User to prevent accidentally destroying the admin role itself
+            # Use SuperAdmin to administer IAM access
+            role_policy_arns: [ "arn:aws:iam::aws:policy/PowerUserAccess" ]
+
+            # TODO Create a "security" team with AdministratorAccess to audit and security, remove "admin" write access to those accounts
+            aws_saml_login_enabled: true
+            # list of roles in primary that can assume into this role in delegated accounts
+            # primary admin can assume delegated admin
+            trusted_teams: [ "admin" ]
+            # GH runner should be moved to its own `ghrunner` role
+            trusted_permission_sets: [ "IdentityAdminRoleAccess" ]
+
+          devops:
+            <<: *user-template
+            role_description: "Provide access to the `devops` team in the `identity` account"
+            role_policy_arns: [ "arn:aws:iam::aws:policy/PowerUserAccess" ]
+
+            aws_saml_login_enabled: false
+            trusted_teams: [ "devops", "admin" ]
+            trusted_permission_sets: [ "IdentityDevopsRoleAccess" ]
+
+    aws-sso:
+      vars:
+        enabled: true
+        identity_roles_accessible:
+          - "admin"
+          - "viewer"
+          - "devops"
+          # - "ops"
+          # - "sre"
+          # - "support"
+        account_assignments:
+          identity:
+            users:
+              "Ilia_Zlobin@org.com":
+                permission_sets:
+                  - IdentityAdminRoleAccess
+                  - IdentityViewerRoleAccess
+                  - IdentityDevopsRoleAccess
+          audit:
+            groups:
+              AWSAuditAccountAdmins:
+                permission_sets:
+                  - AdministratorAccess
+                  - ReadOnlyAccess
+              AWSSecurityAuditPowerUsers:
+                permission_sets:
+                  - ReadOnlyAccess
+          epme3s-prod:
+            users:
+              "Ilia_Zlobin@org.com":
+                permission_sets:
+                  - IdentityAdminRoleAccess
+                  - IdentityDevopsRoleAccess

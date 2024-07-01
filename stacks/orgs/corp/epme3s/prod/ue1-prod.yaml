@@ -1,0 +1,49 @@
+import:
+  - orgs/_defaults
+  - orgs/corp/_defaults
+
+vars:
+  region: us-east-1
+  tenant: epme3s
+  environment: ue1
+  stage: prod
+
+components:
+  terraform:
+    vpc:
+      vars:
+        enabled: true
+        subnet_type_tag_key: "epme3s.lzazure.com/subnet/type"
+        vpc_flow_logs_enabled: true
+        vpc_flow_logs_traffic_type: ALL
+        ipv4_primary_cidr_block: "10.11.0.0/16"
+        ipv4_cidrs:
+          gw: ["10.11.0.0/24", "10.11.1.0/24"]
+          # inspection: ["10.11.10.0/24", "10.11.11.0/24"]
+          service: ["10.11.20.0/24", "10.11.21.0/24"]
+          # protected: ["10.11.90.0/24", "10.11.91.0/24"]
+          # public: ["10.11.100.0/24", "10.11.101.0/24"]
+          private: ["10.11.110.0/24", "10.11.111.0/24"]
+          data: ["10.11.120.0/24", "10.11.121.0/24"]
+        max_subnet_count: 2
+        endpoint_service_names:
+          ssm:
+            name: "com.amazonaws.us-east-1.ssm"
+            type: "Interface"
+            private_dns: true
+          # ssmmessages:
+          #   name: "com.amazonaws.us-east-1.ssmmessages"
+          #   type: "Interface"
+          #   private_dns: true
+          # ec2messages:
+          #   name: "com.amazonaws.us-east-1.ec2messages"
+          #   type: "Interface"
+          #   private_dns: true
+        cloud_wan_enabled: true # enable after provisioning the private subnets
+  argo:
+    vpc:
+      vars:
+        enabled: true
+        subnet_type_tag_key: "epme3s.lzazure.com/subnet/type"
+        vpc_flow_logs_enabled: true
+        vpc_flow_logs_traffic_type: ALL

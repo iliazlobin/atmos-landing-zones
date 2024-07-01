@@ -1,0 +1,5 @@
+import:
+  - orgs/_defaults
+
+vars:
+  tenant: tenants

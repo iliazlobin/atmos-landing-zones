@@ -1,0 +1,9 @@
+import:
+  - mixins/region/global-region
+  - orgs/platform/root/_defaults
+
+components:
+  terraform:
+    "infra/tfstate-backend":
+      vars:
+        cidr_block: 10.11.0.0/18

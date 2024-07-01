@@ -1,0 +1,5 @@
+vars:
+  descriptor_formats:
+    account_name:
+      format: "%s-%s"
+      labels: [tenant, stage]
