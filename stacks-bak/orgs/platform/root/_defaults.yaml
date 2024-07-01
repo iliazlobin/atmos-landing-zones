@@ -1,0 +1,5 @@
+import:
+  - orgs/platform/_defaults
+
+vars:
+  stage: root
