@@ -1,182 +1,193 @@
-# Description
-A cloud landing zone is a standardized architecture and set of processes for deploying and managing cloud infrastructure. It provides a clear and consistent framework for deploying new workloads to the cloud, enabling organizations to take advantage of the benefits of cloud computing while minimizing the risks and complexities. Typically, a cloud landing zone includes a set of core services, such as identity and access management, networking, and security, that are designed to support the deployment of cloud-based workloads. It also includes processes for monitoring, managing, and scaling those workloads over time. By using a cloud landing zone, organizations can accelerate their adoption of the cloud and better manage their cloud infrastructure.
+# Atmos Landing Zones
 
-# Usage
+## Project Overview
 
-## Bootstrap
-TODO
+This repository implements a robust, production-grade **Cloud Landing Zone** using [Atmos](https://github.com/cloudposse/atmos), [Terraform](https://www.terraform.io/), [Helmfile](https://github.com/helmfile/helmfile), and supporting build harnesses. It provides a secure, scalable, and automated foundation for multi-account, multi-region AWS environments, enabling rapid onboarding, compliance, and operational excellence for cloud workloads.
 
-## Core Accounts
-* [root](https://000000000001.signin.aws.amazon.com/console) admin@example.com
-* [identity/000000000002](https://signin.aws.amazon.com/switchrole?account=000000000002&roleName=OrganizationAccountAccessRole&displayName=identity)
-* [dns/000000000003](https://signin.aws.amazon.com/switchrole?account=000000000003&roleName=OrganizationAccountAccessRole&displayName=dns)
-* [audit/000000000004](https://signin.aws.amazon.com/switchrole?account=000000000004&roleName=OrganizationAccountAccessRole&displayName=audit)
+### Core Benefits
+- Automated provisioning of AWS accounts, IAM roles, networking, security, and audit controls
+- Modular, reusable infrastructure as code (IaC) patterns
+- Centralized configuration and policy enforcement
+- Extensible for business units, environments, and future cloud providers
 
-```sh
-cd ~/cloudposse/org
-# make all
-# unset GEODESIC_LOCALHOST
-export GEODESIC_LOCALHOST=/root
-make run
-export HOME=/root
-cd ~
-. ~/.bashrc-geodesic
+---
 
-sudo apt-get install -y xclip
+## Architecture Overview
 
-atmos version
-terraform version
-aws --version
+### Core Accounts & IAM Roles
+- **Identity**: Centralized user and role management (SSO, SAML, teams)
+- **Networking**: VPCs, Cloud WAN, DNS zones, flow logs
+- **Security**: Guardrails, IAM roles, audit logging, encryption
+- **Audit**: Centralized logging, compliance, and monitoring
 
-cd ~/cloudposse/org
+IAM roles are provisioned and delegated using the `aws-teams`, `aws-team-roles`, `aws-sso`, and `aws-saml` Terraform components. Role assumption and permission sets are managed via AWS SSO and SAML integrations.
 
-unset ATMOS_BASE_PATH
-unset ATMOS_CLI_CONFIG_PATH
-export ATMOS_BASE_PATH=~/cloudposse/org/
-export ATMOS_CLI_CONFIG_PATH=~/cloudposse/org/
-export ATMOS_LOGS_VERBOSE=true
-unset ATMOS_LOGS_VERBOSE
+### Terraform & Helmfile Structure
+- **Terraform**: Modular components for accounts, networking, DNS, security, and more, organized under `components/terraform/`
+- **Helmfile**: Kubernetes workload orchestration under `components/helmfile/`, with example charts (e.g., echo-server)
 
-unset AWS_ACCESS_KEY_ID
-unset AWS_SECRET_ACCESS_KEY
-export AWS_SHARED_CREDENTIALS_FILE=~/.aws/credentials
-export AWS_PROFILE=org-landing-zones
-export AWS_DEFAULT_REGION=us-east-1
-aws sts get-caller-identity
-# aws s3api list-objects-v2 --bucket eplz-gbl-root-tfstate --max-items 1
+### Atmos Configuration Model
+- Centralized configuration in `atmos.yaml` and stack YAMLs under `stacks/`
+- Supports environment, region, and account overlays
+- Parameterization via variables, environment variables, and shared credentials
 
-export ATMOS_COMPONENTS_TERRAFORM_AUTO_GENERATE_BACKEND_FILE=false
-unset ATMOS_COMPONENTS_TERRAFORM_AUTO_GENERATE_BACKEND_FILE
-atmos terraform plan tfstate-backend -s eplz-core-gbl-root
-atmos terraform apply tfstate-backend -s eplz-core-gbl-root
-# atmos terraform destroy tfstate-backend -s eplz-core-gbl-root
+### Build Harness Usage
+- CI/CD automation, wrapper scripts, and Docker-based workflows via `build-harness/` and `Makefile`
+- Geodesic shell for reproducible developer environments
 
-atmos terraform plan account -s eplz-core-gbl-root
-atmos terraform apply account -s eplz-core-gbl-root
-atmos terraform output account -s eplz-core-gbl-root
-# atmos terraform destroy account -s eplz-core-gbl-root
+### Multi-Account / Multi-Region
+- Stacks and components support deployment across multiple AWS accounts and regions
+- State isolation and remote state management via S3/DynamoDB backends
 
-atmos terraform plan account-map -s eplz-core-gbl-root
-atmos terraform apply account-map -s eplz-core-gbl-root
-atmos terraform output account-map -s eplz-core-gbl-root
-# atmos terraform destroy account-map -s eplz-core-gbl-root
+---
 
-# aws-teams
-atmos terraform plan aws-teams -s eplz-core-gbl-identity
-atmos terraform apply aws-teams -s eplz-core-gbl-identity
-# atmos terraform destroy aws-teams -s eplz-core-gbl-identity
+## Repository Layout
 
-atmos terraform plan aws-sso -s eplz-core-gbl-identity
-atmos terraform apply aws-sso -s eplz-core-gbl-identity
-# atmos terraform destroy aws-sso -s eplz-core-gbl-identity
-
-# aws-team-roles
-atmos terraform plan aws-team-roles -s eplz-core-gbl-dns
-atmos terraform apply aws-team-roles -s eplz-core-gbl-dns
-# atmos terraform destroy aws-team-roles -s eplz-core-gbl-dns
-atmos terraform state aws-team-roles -s eplz-core-gbl-dns list
-atmos terraform state aws-team-roles -s eplz-core-gbl-dns show local_file.account_info
-atmos terraform state aws-team-roles -s eplz-core-gbl-dns show "aws_iam_role.default[\"terraform\"]"
-# arn:aws:iam::000000000003:role/eplz-core-gbl-dns-terraform
-# arn:aws:iam::000000000002:role/eplz-core-gbl-identity-admin
-
-# corp epmweb
-atmos terraform plan aws-team-roles -s eplz-epmweb-gbl-prod
-atmos terraform apply aws-team-roles -s eplz-epmweb-gbl-prod
-
-# corp epme3s
-atmos terraform plan aws-team-roles -s eplz-epme3s-gbl-prod
-atmos terraform apply aws-team-roles -s eplz-epme3s-gbl-prod
-# atmos terraform status aws-team-roles -s eplz-epme3s-gbl-prod
-
-# audit
-atmos terraform plan aws-team-roles -s eplz-core-gbl-audit
-atmos terraform apply aws-team-roles -s eplz-core-gbl-audit
-
-# network
-atmos terraform plan aws-team-roles -s eplz-core-gbl-network
-atmos terraform apply aws-team-roles -s eplz-core-gbl-network
+```text
+components/         # Terraform modules & Helmfile charts
+  terraform/        # Core infra modules (accounts, vpc, dns, security, etc.)
+  helmfile/         # Kubernetes charts & orchestration
+stacks/             # Org, corp, prod, example stack definitions
+build-harness/      # CI/CD helpers, automation scripts
+terraform-vendor/   # Vendor modules (Cloud Posse, etc.)
+atmos.yaml          # Atmos configuration
+Dockerfile          # Geodesic shell & Atmos/Terraform/Helmfile setup
+Makefile            # Build harness entrypoint
 ```
 
-## Corp Accounts
-* [network/000000000005](https://signin.aws.amazon.com/switchrole?account=000000000005&roleName=OrganizationAccountAccessRole&displayName=network)
-* [dns/000000000003](https://signin.aws.amazon.com/switchrole?account=000000000003&roleName=OrganizationAccountAccessRole&displayName=dns)
-* [audit/000000000004](https://signin.aws.amazon.com/switchrole?account=000000000004&roleName=OrganizationAccountAccessRole&displayName=audit)
-* [epme3s/000000000006](https://signin.aws.amazon.com/switchrole?account=000000000006&roleName=OrganizationAccountAccessRole&displayName=epme3s)
-* [epmweb/000000000007](https://signin.aws.amazon.com/switchrole?account=000000000007&roleName=OrganizationAccountAccessRole&displayName=epmweb)
+---
 
+## Bootstrap Instructions
+
+1. **Install Prerequisites**
+	- Docker, AWS CLI, Terraform, Atmos, Helmfile
+2. **Initialize Geodesic Shell**
+	```sh
+	make run
+	. ~/.bashrc-geodesic
+	atmos version
+	terraform version
+	aws --version
+	```
+3. **Configure AWS Credentials**
+	```sh
+	export AWS_SHARED_CREDENTIALS_FILE=~/.aws/credentials
+	export AWS_PROFILE=org-landing-zones
+	export AWS_DEFAULT_REGION=us-east-1
+	aws sts get-caller-identity
+	```
+4. **Bootstrap Core Accounts**
+	```sh
+	atmos terraform apply tfstate-backend -s eplz-core-gbl-root
+	atmos terraform apply account -s eplz-core-gbl-root
+	atmos terraform apply account-map -s eplz-core-gbl-root
+	atmos terraform apply aws-teams -s eplz-core-gbl-identity
+	atmos terraform apply aws-sso -s eplz-core-gbl-identity
+	atmos terraform apply aws-team-roles -s eplz-core-gbl-dns
+	atmos terraform apply aws-team-roles -s eplz-core-gbl-audit
+	atmos terraform apply aws-team-roles -s eplz-core-gbl-network
+	atmos terraform apply dns-primary -s eplz-core-gbl-dns
+	atmos terraform apply vpc-flow-logs-bucket -s eplz-core-gbl-audit
+	atmos terraform apply cloud-wan -s eplz-core-gbl-network
+	atmos terraform apply vpc -s eplz-core-gbl-network
+	```
+5. **Assume Roles & Validate**
+	```sh
+	aws sts assume-role --role-arn "arn:aws:iam::<account_id>:role/<role_name>" --role-session-name AWSCLI-Session
+	aws sts get-caller-identity
+	```
+
+---
+
+## Usage Guide
+
+### Deploy New Stacks
 ```sh
-unset AWS_PROFILE
-export AWS_ACCESS_KEY_ID="___"
-export AWS_SECRET_ACCESS_KEY="___"
-export AWS_SESSION_TOKEN="___"
-aws sts get-caller-identity
-# aws sts assume-role --role-arn "arn:aws:iam::000000000002:role/eplz-core-gbl-identity-admin" --role-session-name AWSCLI-Session
-ADMIN_ASSUME_ROLE=$(aws sts assume-role --role-arn "arn:aws:iam::000000000002:role/eplz-core-gbl-identity-admin" --role-session-name AWSCLI-Session); echo $ADMIN_ASSUME_ROLE
-export AWS_ACCESS_KEY_ID=$(echo $ADMIN_ASSUME_ROLE | jq -r '.Credentials.AccessKeyId'); echo $AWS_ACCESS_KEY_ID
-export AWS_SECRET_ACCESS_KEY=$(echo $ADMIN_ASSUME_ROLE | jq -r '.Credentials.SecretAccessKey'); echo $AWS_SECRET_ACCESS_KEY
-export AWS_SESSION_TOKEN=$(echo $ADMIN_ASSUME_ROLE | jq -r '.Credentials.SessionToken'); echo $AWS_SESSION_TOKEN
-aws sts get-caller-identity
+atmos terraform plan <component> -s <stack>
+atmos terraform apply <component> -s <stack>
+```
 
-aws sts assume-role --role-arn "arn:aws:iam::000000000003:role/eplz-core-gbl-dns-terraform" --role-session-name AWSCLI-Session
-# TERRAFORM_DNS_ASSUME_ROLE=$(aws sts assume-role --role-arn "arn:aws:iam::000000000003:role/eplz-core-gbl-dns-terraform" --role-session-name AWSCLI-Session); echo $TERRAFORM_DNS_ASSUME_ROLE
-# export AWS_ACCESS_KEY_ID=$(echo $TERRAFORM_DNS_ASSUME_ROLE | jq -r '.Credentials.AccessKeyId'); echo $AWS_ACCESS_KEY_ID
-# export AWS_SECRET_ACCESS_KEY=$(echo $TERRAFORM_DNS_ASSUME_ROLE | jq -r '.Credentials.SecretAccessKey'); echo $AWS_SECRET_ACCESS_KEY
-# export AWS_SESSION_TOKEN=$(echo $TERRAFORM_DNS_ASSUME_ROLE | jq -r '.Credentials.SessionToken'); echo $AWS_SESSION_TOKEN
-# aws sts get-caller-identity
+### Manage Environments
+- Stacks are defined for org, corp, prod, dev, etc. in `stacks/`
+- Use overlays and variables for environment-specific configuration
 
-aws sts assume-role --role-arn "arn:aws:iam::000000000001:role/eplz-core-gbl-root-terraform" --role-session-name AWSCLI-Session
-# TERRAFORM_CORE_ASSUME_ROLE=$(aws sts assume-role --role-arn "arn:aws:iam::000000000001:role/eplz-core-gbl-root-terraform" --role-session-name AWSCLI-Session); echo $TERRAFORM_CORE_ASSUME_ROLE
-# export AWS_ACCESS_KEY_ID=$(echo $TERRAFORM_CORE_ASSUME_ROLE | jq -r '.Credentials.AccessKeyId'); echo $AWS_ACCESS_KEY_ID
-# export AWS_SECRET_ACCESS_KEY=$(echo $TERRAFORM_CORE_ASSUME_ROLE | jq -r '.Credentials.SecretAccessKey'); echo $AWS_SECRET_ACCESS_KEY
-# export AWS_SESSION_TOKEN=$(echo $TERRAFORM_CORE_ASSUME_ROLE | jq -r '.Credentials.SessionToken'); echo $AWS_SESSION_TOKEN
-# aws sts get-caller-identity
-# aws s3api list-objects-v2 --bucket eplz-core-gbl-root-tfstate --max-items 1
-# aws dynamodb get-item \
-#     --table-name eplz-core-gbl-root-tfstate-lock \
-#     --key '{"LockID": {"S": "eplz-core-gbl-root-tfstate/tfstate-backend/eplz-core-gbl-root/terraform.tfstate-md5"}}'
-
-aws sts assume-role --role-arn "arn:aws:iam::000000000007:role/eplz-epmweb-gbl-prod-terraform" --role-session-name AWSCLI-Session
-aws sts assume-role --role-arn "arn:aws:iam::000000000006:role/eplz-epme3s-gbl-prod-terraform" --role-session-name AWSCLI-Session
-
-# core dns
-atmos terraform plan dns-primary -s eplz-core-gbl-dns
-atmos terraform apply dns-primary -s eplz-core-gbl-dns
-
-# audit
-atmos terraform plan vpc-flow-logs-bucket -s eplz-core-gbl-audit
-atmos terraform apply vpc-flow-logs-bucket -s eplz-core-gbl-audit
-
-# network
-atmos terraform plan cloud-wan -s eplz-core-gbl-network
-atmos terraform apply cloud-wan -s eplz-core-gbl-network
-# atmos terraform destroy cloud-wan -s eplz-core-gbl-network # manual removal
-
+### Run Terraform via Atmos
+```sh
 atmos terraform plan vpc -s eplz-core-gbl-network
 atmos terraform apply vpc -s eplz-core-gbl-network
-# atmos terraform destroy vpc -s eplz-core-gbl-network
-
-# corp epme3s
-atmos terraform plan dns-delegated -s eplz-epme3s-gbl-prod
-atmos terraform apply dns-delegated -s eplz-epme3s-gbl-prod
-
-atmos terraform plan vpc -s eplz-epme3s-ue1-prod
-atmos terraform apply vpc -s eplz-epme3s-ue1-prod
-# atmos terraform force-unlock vpc -s eplz-epme3s-ue1-prod -force f0131563-efde-bb24-e281-3bb855c17883
-# atmos terraform state vpc -s eplz-epme3s-ue1-prod list
-# atmos terraform state aws-team-roles -s eplz-core-gbl-dns show local_file.account_info
-# atmos terraform state aws-team-roles -s eplz-core-gbl-dns show "aws_iam_role.default[\"terraform\"]"
-# atmos terraform destroy vpc -s eplz-epme3s-ue1-prod
-
-# corp epmweb
-atmos terraform plan dns-delegated -s eplz-epmweb-gbl-prod
-atmos terraform apply dns-delegated -s eplz-epmweb-gbl-prod
-
-atmos terraform plan vpc -s eplz-epmweb-ue1-prod
-atmos terraform apply vpc -s eplz-epmweb-ue1-prod
-# atmos terraform force-unlock vpc -s eplz-epmweb-ue1-prod -force f0131563-efde-bb24-e281-3bb855c17883
-# atmos terraform state vpc -s eplz-epmweb-ue1-prod list
-# atmos terraform state aws-team-roles -s eplz-core-gbl-dns show local_file.account_info
-# atmos terraform state aws-team-roles -s eplz-core-gbl-dns show "aws_iam_role.default[\"terraform\"]"
-# atmos terraform destroy vpc -s eplz-epmweb-ue1-prod
 ```
+
+### Integrate with AWS CLI & Validate IAM Roles
+```sh
+aws sts assume-role --role-arn "arn:aws:iam::<account_id>:role/<role_name>" --role-session-name AWSCLI-Session
+aws sts get-caller-identity
+```
+
+---
+
+## Development Workflow
+
+### Make & Build Harness
+- Use `make` targets for common tasks (init, deps, build, run)
+- CI/CD helpers in `build-harness/`
+
+### Terraform Plans & Applies
+- Use Atmos CLI for all Terraform operations
+- State managed via S3/DynamoDB backends
+
+### Helmfile for Kubernetes
+- Deploy charts via Helmfile in `components/helmfile/`
+
+### Testing Changes
+- Use `stacks-example/` for sandbox and test deployments
+
+---
+
+## Configuration & Parameters
+
+- **atmos.yaml**: Central config for component paths, stack overlays, workflows
+- **Environment Variables**: Used for credentials, region, verbosity, etc.
+- **.aws/credentials**: Shared AWS credentials file
+
+---
+
+## Security & Compliance
+
+- IAM guardrails, least-privilege roles, and audit logging
+- VPC Flow Logs, encrypted S3 buckets, and centralized logging
+- Network segmentation and account isolation
+- Automated role assumption and permission set management
+
+---
+
+## Extensibility
+
+- Add new Terraform components in `components/terraform/`
+- Add new stacks for business units or environments in `stacks/`
+- Customize policies, networking, and guardrails via overlays and variables
+
+---
+
+## Roadmap
+
+- Multi-cloud support (Azure, GCP)
+- Advanced monitoring and observability
+- CI/CD pipeline integration
+- Policy-as-code and automated compliance
+
+---
+
+## References
+
+- [Atmos Documentation](https://github.com/cloudposse/atmos)
+- [Terraform Documentation](https://www.terraform.io/docs/)
+- [Helmfile Documentation](https://github.com/helmfile/helmfile)
+- [AWS Landing Zone Best Practices](https://docs.aws.amazon.com/controltower/latest/userguide/landing-zone.html)
+
+---
+
+## License & Credits
+
+This repository is licensed under the [Apache 2.0 License](LICENSE).
+
+Credits: Cloud Posse, AWS, Helmfile, Terraform, and all contributors.
