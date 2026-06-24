@@ -1,2 +1,34 @@
+# Terraform
 .terraform
+.terraform/
+.terraform.tfstate.lock.info
+*.tfstate
+*.tfstate.*
 terraform.tfstate.d
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Secrets / sensitive vars
+*.tfvars
+!default.auto.tfvars
+*.tfvars.json
+.env
+.env.*
+*.pem
+*.key
+credentials
+.aws/
+
+# Build harness
+.build-harness
+.build-harness-extensions/
+
+# Editor / OS
+.idea/
+.vscode/
+.DS_Store
+*.swp
