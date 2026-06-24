@@ -212,9 +212,13 @@ Stack names follow `{namespace}-{tenant}-{environment}-{stage}` (e.g. `eplz-epme
 
 ## Notes for Reviewers
 
-This is a portfolio reference implementation. AWS account IDs, ARNs, and email domains in the
-stack YAML correspond to a former demonstration organization and are retained for fidelity of the
-example; they are not live credentials and contain no secrets, access keys, or state files.
+This is a portfolio reference implementation, not a deployable configuration. All AWS account IDs
+(e.g. `111111111111`), ARNs, email addresses (e.g. `admin@example.com`), and domains
+(e.g. `example.com`) in the stack YAML and component files are non-functional placeholders. Before
+using any of this as a starting point, replace them with your own account IDs, emails, and domains.
+They are not live credentials and contain no secrets, access keys, or state files. (Upstream public
+constants from CloudPosse, Datadog, and Spacelift — such as their published AWS account IDs and ECR
+registry IDs — are left intact as required by those modules.)
 
 ---
 
